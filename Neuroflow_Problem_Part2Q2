@@ -1,0 +1,24 @@
+/* 
+1. Assuming providers is unique by provider_id, but not unique by organization_id
+2. Assuming that organization_id and organization_name are 1-to-1
+*/
+
+proc sql;										                  /* Combines providers and Phq9 tables based on provider_id */
+create table step1 as
+select * from phq9 a
+left join providers b
+on a.provider_id = b.provider_id;
+
+proc means data=step1 nway missing noprint;		/* Finds average phq9 score by organization_id */
+class organization_id;	
+var score;
+output out=step2 (drop=_:) mean=avg_org_score;
+run;
+
+proc sort data=step2 out=step3;					      /* Sorts step2 table by descending avg phq9 score */ 
+by descending avg_org_score;
+run;
+
+data step4;										                /* Isolates top 5 records of step3 table, showing top 5 table */
+set step3 (obs=5);
+run;
