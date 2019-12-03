@@ -1,0 +1,20 @@
+/* 
+1. Assuming providers is unique by provider_id, but not unique by organization_id
+2. Assuming that organization_id and organization_name are 1-to-1
+*/
+
+create table step1 as									/* Combines providers and Phq9 tables based on provider_id */
+select * from phq9 a
+left join providers b
+on a.@provider_id = b.@provider_id;
+
+create table step2 as									/* Finds average phq9 score by organization_id */
+select @organization_id, avg(@score) as avg_org_score
+group by @organization_id;
+
+create table step3 as									/* Sorts step2 table by descending avg phq9 score */
+select * from step2
+order by avg_org_score desc;
+
+create table step4 as									/* Isolates top 5 records of step3 table, showing top 5 table */
+select top(5) * from step3;
