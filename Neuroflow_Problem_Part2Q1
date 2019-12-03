@@ -1,0 +1,46 @@
+/*
+1. Assuming "created_at" is a date format
+2. Assuming both tables have distinct user_id, and the same number of unique id's (can adjust code if not, not too complicated) 
+3. "COUNT" is the default column name for frequency from proc freq
+*/
+
+proc sql;													                        /* Combines users and exercises table based on user_id */
+create table step1 as					
+select * from users a
+left join exercises b
+on a.user_id = b.user_id;
+
+data step2;							
+set step1;
+created = put(created_at,yymmdd10.);						          /* Converts date format 'created_at' to character string 'created' */
+YM = input(substr(created,1,4)||substr(created,5,2));		  /* Add column YM to break up users into cohorts based on Year+Month */
+drop created;
+run;
+
+data step3;
+set step2;
+if month(created_at) = month(exercise_completion_date);		/* Add flag 1 if exercise occurred within first month of signing up, otherwise 0 */
+then complete_first = 1;
+else complete_first = 0;
+run;
+
+proc freq data=step3 noprint;								              /* Creates frequency table based off of flag, by cohort */
+table YM*complete_first/missing out=step4;			
+run;
+
+proc means data=step4 nway missing noprint;					      /* Adds total count of users in each cohort */
+class YM;
+var COUNT;
+output out=step5 (drop=_:) sum=total_cohort;
+run;
+
+proc sql;													                        /* Append total count of cohort users to frequency table */
+create table step6 as
+select * from step4 a
+left join step5 b
+on a.YM = b.YM;
+
+data final;													                      /* Calculate percent of users completing exercise in first month, by cohort */
+set step6;
+pct_complete_first = (COUNT / total_cohort)*100;
+run;
