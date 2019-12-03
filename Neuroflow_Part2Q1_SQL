@@ -1,0 +1,42 @@
+/*
+1. Assuming "created_at" is a date format
+2. Assuming both tables have distinct user_id, and the same number of unique id's (can adjust code if not, not too complicated) 
+*/
+
+create table step1 as																                           /* Combine users and exercise tables, convert date into integer of format YYYYMM */
+select * from users a
+left join exercises b
+on a.@user_id = b.@user_id;
+declare @cohort datetime
+set @cohort = getdate()
+select cast(format(@cohort,'yyyyMM') as int)
+
+create table step2 as
+select * from step1
+declare @complete_first int
+case when year(@created_at) * 100 + month(@created_at) = 
+		year(@exercise_completion_date) * 100 + month(@exercise_completion_date)	/* Creates flags based on if year and month of created_at and exercise_completion_date are equal */
+	 then set @complete_first = 1
+	 else set @complete_first = 0;
+
+create table step3 as																                          /* Counts flag frequency by cohort */
+select @cohort, count(@complete_first) as @count_complete
+from step2							
+group by @cohort;
+
+create table step4 as
+select @cohort, count(*) as @count_total											                /* Counts total freqeuency by cohort */
+from step3
+group by @cohort;
+
+create table step5 as																                          /* Append total freq to flags by cohort frequency */
+select * from step3 a 
+left join step4 b
+on a.@cohort=b.@cohort;
+
+create table final as																                          /* Calculates percent of total that did/did not complete exercise in first month */
+select * from step5
+declare @pct_complete_first int
+set @pct_complete_first = (@count_complete / @count_total) * 100; 
+
+		
