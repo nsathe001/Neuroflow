@@ -1,0 +1,144 @@
+/* 1. Does sleep/mood correlate negatively with stress? (ex. good sleep = low stress, etc.) 
+   2. Does stress have an effect on mood/sleep? 
+   3. Are users with generally higher stress affected by the quality of their sleep? Same for low avg stress users.
+   4. What is the frequency of users with good sleep and low rumination stress, but high anticipatory stress?
+   5. What is the frequency of users with bad sleep and high rumination stress, but low anticipatory stress?
+   6. Is there a clear independant factor? sleep/mood can affect stress levels, but stress levels can also affect sleep/mood.
+*/
+   
+   /*Below is my attempt to answer these questions, using SAS code
+	I am more than happy to walk you through my logic, given that you asked for this to be done in SQL 
+   */
+   
+/* Q1/Q2/Q4/Q5: Break user scores up into groupings, by day */
+
+	/* GROUPINGS */
+
+	data Q1Q2_step1;												/* Reformats date variable to only include date itself, not time */
+	format day date9.;										/* This is for the sake of averaging / grouping by day */
+	set subj_measures;
+	day = date;
+	drop date;
+	rename day=date;
+	run;
+
+	proc means data=Q1Q2_step1 nway missing noprint;				/* finds average score for all 4 metrics by user, date, and type */
+	class user_id date type;
+	var score;
+	output out=Q1Q2_step2 (drop=_:) mean=;
+	run;
+
+	proc transpose data=Q1Q2_step1 out=Q1Q2_step2;					/* "flips" the type column into distinct columns for each metric */
+	by user_id date;										/* Columns in resulting table are: user_id, date, Sleep, Mood, ruminationstress, anticipatorystress */
+	id type;												/* unique by user_id and day */
+	var score;
+	run;
+
+	data Q1Q2_step3;												/* Groups each unique user_id + day into 1 of 5 categories for SLEEP*/ 
+	set Q1Q2_step2;
+	if 0 <= sleep < 0.5 then sleep_group =  'AWFUL';
+	else if 0.5 <= sleep < 1.5 then sleep_group = 'BAD';
+	else if 1.5 <= sleep < 2.5 then sleep_group = 'OKAY';
+	else if 2.5 <= sleep < 3.5 then sleep group = 'GOOD';
+	else if 3.5 <= sleep < 4 then sleep_group = 'GREAT';
+	run;
+
+	data Q1Q2_step4;												/* Groups each unique user_id + day into 1 of 5 categories for MOOD*/
+	set Q1Q2_step3;
+	if 0 <= mood < 0.5 then mood_group =  'AWFUL';
+	else if 0.5 <= mood < 1.5 then mood_group = 'BAD';
+	else if 1.5 <= mood < 2.5 then mood_group = 'OKAY';
+	else if 2.5 <= mood < 3.5 then mood group = 'GOOD';
+	else if 3.5 <= mood < 4 then mood_group = 'GREAT';
+	run;
+
+	data Q1Q2_step5;												/* Groups each unique user_id + day into 1 of 5 categories for R-STRESS */
+	set Q1Q2_step4;
+	if 0 <= ruminationstress < 0.5 then r_stress_group =  'NOT AT ALL';
+	else if 0.5 <= ruminationstress < 1.5 then r_stress_group = 'SLIGHTLY';
+	else if 1.5 <= ruminationstress < 2.5 then r_stress_group = 'MODERATELY';
+	else if 2.5 <= ruminationstress < 3.5 then r_stress_group = 'VERY';
+	else if 3.5 <= ruminationstress < 4 then r_stress_group = 'EXTREMELY';
+	run;
+
+	data Q1Q2_step6;												/* Groups each unique user_id + day into 1 of 5 categories for A-STRESS*/
+	set Q1Q2_step5;
+	if 0 <= anticipatorystress < 0.5 then a_stress_group =  'NOT AT ALL';
+	else if 0.5 <= anticipatorystress < 1.5 then a_stress_group = 'SLIGHTLY';
+	else if 1.5 <= anticipatorystress < 2.5 then a_stress_group = 'MODERATELY';
+	else if 2.5 <= anticipatorystress < 3.5 then a_stress_group = 'VERY';
+	else if 3.5 <= anticipatorystress < 4 then a_stress_group = 'EXTREMELY';
+	run;
+
+	data Q1Q2_step7;												/* drops numeric score variables (will revisit these) */
+	set Q1Q2_step6;
+	drop sleep mood anticipatorystress ruminationstress _NAME_;
+	run;
+
+		/* At this point, the table "Q1Q2_step7" has 6 columns: user_id, date, sleep_group, mood_group, a_stress_group, r_stress_group */
+		   The ranges for each group are simply business rules I created, and can be changed at any time if needed.
+		   They were done this way due to the fact the the score is on a float scale.
+		*/   
+
+	proc freq data=Q1Q2_step7 noprint;
+	table sleep_group*r_stress_group/missing out=sleep_r_stress;
+	table sleep_group*a_stress_group/missing out=sleep_a_stress;
+	run;
+	
+		/* The results of this procedure would tell us which sleep group is found most commonly with which level of stress.
+			We could see that (for example) good sleep and low anticipatory stress are the most common pairing, meaning that good sleep could contribute to haveing less stress about the future.
+			We could also see that good sleep and medium to high rumination is the most common pairing, meaning that having high rumination stress may not affect quality of sleep.
+			I would then take the output of this table and create some trend/bar charts to visualize this information.
+		*/
+
+	proc freq data=Q1Q2_step7 noprint;
+	table mood_group*r_stress_group/missing out=mood_r_stress;
+	table mood_group*a_stress_group/missing out=mood_a_stress;
+	run;	
+	
+		/* This would test the same as above, in relation to mood instead of sleep */
+		
+/* Q3: Calculate avg stress by user, see if good/bad sleep/mood has more effect depending on avg stress */
+	
+	proc means data=Q1Q2_step2 nway missing noprint;							/* Finds the average a-stress and r-stress level of each user */
+	class user_id;
+	var anticipatorystress ruminationstress;
+	output out=Q3_step1 (drop=_:) mean=;
+	run;
+	
+		data Q3_step2;															/* Groups users into HIGH/MED/LOW for a-stress levels */
+		set Q3_step1;
+		if 0 <= anticipatorystress < 1.5 then avg_a_stress = 'LOW';
+		else if 1.5 <= anticipatorystress < 2.5 then avg_a_stress = 'MED';
+		else if 2.5 <= anticipatorystress < 4 then avg_a_stress = 'HIGH';
+		run;
+		
+		data Q3_step3;															/* Groups users into HIGH/MED/LOW for r-stress level */
+		set Q3_step2;
+			if 0 <= ruminationstress < 1.5 then avg_r_stress = 'LOW';		
+		else if 1.5 <= ruminationstress < 2.5 then avg_r_stress = 'MED';
+		else if 2.5 <= ruminationstress < 4 then avg_r_stress = 'HIGH';
+		keep user_id avg_a_stress avg_r_stress;
+		run;
+	
+	proc sql;																	/* Append user avg stress level group to daily sleep/mood quality */
+	create table Q3_step4 as
+	select a.sleep_group,
+		a.mood_group,
+		b.avg_a_stress,
+		b.avg_r_stress
+	from Q1Q2_step4 a
+	left join Q3_step3 b
+	on a.user_id = b.user_id;
+	
+	proc freq data=Q3_step4 noprint;												
+	table avg_a_stress*sleep_group/missing out=a_stress_eff_sleep;
+	table avg_a_stress*mood_group/missing out=a_stress_eff_sleep;
+	table avg_r_stress*sleep_group/missing out=a_stress_eff_sleep;
+	table avg_r_stress*mood_group/missing out=a_stress_eff_sleep;
+	run;
+	
+		/* An even distribution of frequencies would indicate that there is no relation between high/low avg stress and sleep/mood.
+		   However, if a certain pairing is more common than the others, this could be indicative of a correlation between the two
+		*/
+	
