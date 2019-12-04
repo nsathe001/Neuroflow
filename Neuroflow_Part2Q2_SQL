@@ -10,6 +10,7 @@ on a.@provider_id = b.@provider_id;
 
 create table step2 as									/* Finds average phq9 score by organization_id */
 select @organization_id, avg(@score) as avg_org_score
+from step1
 group by @organization_id;
 
 create table step3 as									/* Sorts step2 table by descending avg phq9 score */
