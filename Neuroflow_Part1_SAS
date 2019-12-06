@@ -134,8 +134,8 @@
 	proc freq data=Q3_step4 noprint;												
 	table avg_a_stress*sleep_group/missing out=a_stress_eff_sleep;
 	table avg_a_stress*mood_group/missing out=a_stress_eff_sleep;
-	table avg_r_stress*sleep_group/missing out=a_stress_eff_sleep;
-	table avg_r_stress*mood_group/missing out=a_stress_eff_sleep;
+	table avg_r_stress*sleep_group/missing out=r_stress_eff_sleep;
+	table avg_r_stress*mood_group/missing out=r_stress_eff_sleep;
 	run;
 	
 		/* An even distribution of frequencies would indicate that there is no relation between high/low avg stress and sleep/mood.
